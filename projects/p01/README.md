@@ -14,6 +14,7 @@
 
 ## D0 Priority Checklist
 
+- [ ] Verify SWOT L2 sigma0-derived wind speed quality in the Gulf Stream and Kuroshio Extension pilot boxes
 - [ ] Download SWOT KaRIn L2 SSH for Gulf Stream and Kuroshio Extension pilot boxes; verify swath geometry, noise floor, and along-track/cross-track resolution
 - [ ] Download concurrent GOES/Himawari SST and ASCAT winds; quantify collocation sample size (SWOT pass × clear-sky SST × scatterometer overlap)
 - [ ] Compute scale-dependent coupling coefficient (wind speed gradient vs. SST gradient regression slope) as a function of spatial filter cutoff wavelength, using ASCAT + GOES SST as a quick prototype
@@ -49,16 +50,16 @@ All datasets are public. Raw data must not be committed; only download scripts, 
 **Primary datasets (the observational triad):**
 
 - **SWOT KaRIn L2 Low Rate SSH** (PO.DAAC): submesoscale ocean structure — fronts, eddies, filaments, strain. This is the primary SWOT product with well-validated quality. Used to identify and characterize submesoscale ocean features, not as a wind source.
+- **SWOT L2 sigma0-derived wind speed**: primary atmospheric response field. Used to quantify wind-speed anomalies, wind-speed gradients, and near-surface wind kinetic energy proxy at SWOT swath resolution.
 - **Geostationary SST**: high-frequency, cloud-permitting SST frontal structure.
   - GOES-East ABI SST / NOAA ACSPO (Gulf Stream sector)
   - Himawari-8/9 AHI SST (Kuroshio Extension sector)
-- **ASCAT ocean vector winds** (MEaSUREs-OSVW, MetOp ASCAT): the atmospheric response field. Vector winds enable decomposition into downwind and crosswind components relative to SST fronts.
 
 **Supporting datasets:**
 
 - ERA5 10 m winds: gridded background for large-scale atmospheric state removal.
 - CCMP ocean surface winds: optional comparison for scale sensitivity.
-- SWOT L2 sigma0-derived wind speed: secondary product; used only if validated quality is confirmed, as an independent check at SWOT resolution.
+- SCAT ocean vector winds (MEaSUREs-OSVW, MetOp ASCAT): the atmospheric response field. Vector winds enable decomposition into downwind and crosswind components relative to SST fronts.
 
 ## Method
 
@@ -69,55 +70,69 @@ All datasets are public. Raw data must not be committed; only download scripts, 
 
 ### Analysis framework
 
-**Step 1: Collocation and quality control**
+### Step 1: Collocation and quality control
 
-Collocate SWOT swaths, geostationary SST, and ASCAT winds within defined time windows (±1 h for SST, ±3 h for scatterometer). Apply cloud masking, rain flagging, and quality filters. Report final sample sizes.
+Collocate SWOT wind speed, SWOT SSH, geostationary SST, and comparison wind products. Apply quality flags for SWOT, cloud masks for SST, rain/land contamination checks, and time-window sensitivity tests.
 
-**Step 2: Multi-scale decomposition**
+### Step 2: Multi-scale decomposition
 
-Apply spatial filtering (Gaussian, Lanczos, or wavelet) at a series of cutoff wavelengths (10, 20, 50, 100, 200, 500 km) to separate the SST, SSH, and wind fields into scale bands. Sensitivity tests on filter choice.
+Filter SWOT wind speed, SST, and SSH into scale bands such as 10, 20, 50, 100, 200, and 500 km. The key point is to avoid letting the coarser comparison products define the finest scale that SWOT can test.
 
-**Step 3: Scale-dependent coupling coefficient (core diagnostic)**
+### Step 3: SWOT-based wind-speed response diagnostics
 
-For each scale band, compute:
-- Regression slope: ∂U'/∂SST' (wind speed anomaly vs. SST anomaly) — the classic coupling coefficient
-- Coherence: magnitude-squared coherence between SST gradient and wind speed gradient as a function of wavenumber
-- Phase: phase angle between SST and wind fields — downwind coupling produces ~0° phase; cross-wind emergence shifts the phase
+Use SWOT wind speed as the core wind field:
 
-Plot all three quantities as functions of wavelength. The key figure: does the coupling coefficient curve show a break, plateau, or sign change in the submesoscale band?
+```text
+K10_SWOT = 0.5 * U10_SWOT^2
+```
 
-**Step 4: SWOT SSH as a regime boundary predictor**
+Primary diagnostics:
 
-Condition the coupling analysis on SWOT SSH gradient magnitude:
-- Partition observations into bins of SSH gradient strength (proxy for frontal sharpness and dynamical intensity)
-- Test whether the scale of regime transition shifts as a function of SSH gradient — sharper fronts may trigger regime change at larger wavelengths
+- `U10_SWOT'` and `K10_SWOT'` anomalies.
+- `|grad U10_SWOT|` and `|grad K10_SWOT|`.
+- Spatial collocation with `|grad SST_geo|` and `|grad SSH_SWOT|`.
+- Differences between SWOT-resolved structures and ASCAT/ERA5/CCMP structures.
 
-**Step 5: Downwind vs. crosswind decomposition**
+### Step 4: Scale-dependent coupling coefficients
 
-Using ASCAT vector winds and SST front orientation (from geostationary SST gradient direction):
-- Decompose wind anomalies into front-parallel and front-perpendicular components
-- At mesoscale, expect dominant downwind (pressure-adjustment) signal
-- At submesoscale, test for emergence of crosswind component (vertical-mixing or secondary-circulation signal)
+Primary SWOT-based coefficients:
 
-**Step 6: Gulf Stream vs. Kuroshio comparison**
+```text
+|grad U10_SWOT| = alpha(lambda) |grad SST_geo| + residual
+|grad K10_SWOT| = beta(lambda) |grad SST_geo| + residual
+K10_SWOT' = gamma(lambda) SST_front_metric + residual
+```
 
-Compare the regime transition wavelength, coupling coefficient curves, and crosswind emergence between the two basins. Interpret differences in terms of frontal sharpness, mixed-layer depth climatology, and atmospheric stability.
+The coefficients should be estimated as functions of wavelength or filter cutoff `lambda`. A break, plateau, or phase shift in these curves would indicate scale-dependent coupling or a possible regime transition.
 
-**Step 7: Control regions**
+Vector-wind curl/divergence diagnostics are not part of the initial core analysis. They can be revisited later only if they become necessary for a separate mechanism test.
 
-Repeat the coupling analysis in weak-gradient regions (e.g., subtropical gyres, 20–25°N) to confirm that regime transition signatures are absent where submesoscale fronts are weak.
+### Step 5: Spectral and coherence analysis
+
+Compute co-spectrum, coherence, and phase between:
+
+- SWOT wind-speed gradients and geostationary SST gradients.
+- SWOT wind kinetic energy anomalies and geostationary SST fronts.
+- SWOT wind kinetic energy anomalies and SWOT SSH gradients.
+- SWOT wind speed and traditional wind products, to quantify what traditional products miss.
+
+### Step 6: Controls and interpretation
+
+Repeat the analysis in weaker-front regions (e.g., subtropical gyres, 20–25°N) to test whether the scale-dependent coupling signature is specific to western boundary currents. Interpret results cautiously because wind kinetic energy can be affected by both large-scale atmospheric forcing and ocean-front-induced boundary-layer adjustment.
+
 
 ## Expected Outputs
 
-- D0 feasibility note: data access verification, collocation statistics, literature landscape, and prototype coupling coefficient curve (ASCAT + GOES, before SWOT integration).
-- Candidate figures for the manuscript:
-  1. **Scale-dependent coupling coefficient curve** for Gulf Stream and Kuroshio Extension, showing the mesoscale-to-submesoscale transition (the "money figure").
-  2. **Coherence and phase spectra** between SST and wind fields as functions of wavenumber, with the regime boundary marked.
-  3. **SWOT SSH gradient conditioning**: how frontal dynamical intensity modulates the transition wavelength.
-  4. **Downwind vs. crosswind decomposition** showing emergence of crosswind coupling at submesoscales.
-  5. **Gulf Stream vs. Kuroshio comparison** of transition characteristics.
-  6. **Control region null result**: flat coupling coefficient curve in weak-gradient regions.
-- Reproducible Python scripts for all analyses.
+- A D0 feasibility note on SWOT wind speed quality, collocation statistics, and initial coupling diagnostics.
+- A data-requirements and discussion note in `literature/`.
+- Reproducible scripts for collocation, filtering, SWOT wind kinetic energy, coupling coefficients, and spectral diagnostics.
+- Candidate figures:
+  1. SWOT wind speed / `K10_SWOT` structures over GOES/Himawari SST fronts.
+  2. Comparison of SWOT wind speed with ASCAT/ERA5/CCMP in the same region.
+  3. Scale-dependent coupling coefficient curves based on SWOT wind speed and geostationary SST.
+  4. Coherence and phase spectra between SWOT wind speed, SST fronts, and SWOT SSH gradients.
+  5. Gulf Stream versus Kuroshio Extension comparison.
+  6. Control-region null or weak-coupling result.
 
 ## Feasibility and Risks
 
